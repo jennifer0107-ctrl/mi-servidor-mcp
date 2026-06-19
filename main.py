@@ -2,7 +2,7 @@ import os
 import requests
 from mcp.server.fastmcp import FastMCP
 
-# Inicializamos el servidor MCP en modo HTTP web
+# Inicializamos el servidor FastMCP estándar
 mcp = FastMCP("Estacion_AutoMind")
 
 # Credenciales de tu canal de ThingSpeak
@@ -34,5 +34,10 @@ def consultar_clima_actual() -> str:
         return f"Error al conectar con ThingSpeak: {str(error)}"
 
 if __name__ == "__main__":
+    # Importación interna para asegurar compatibilidad con el entorno de Render
+    from mcp.server.fastmcp.server import ASMServer
+    
+    # Forzamos a que corra como un servidor web HTTP en el puerto que pide Render
     puerto = int(os.environ.get("PORT", 8000))
-    mcp.run(host="0.0.0.0", port=puerto)
+    server = ASMServer(mcp)
+    server.run(host="0.0.0.0", port=puerto, transport="http")
