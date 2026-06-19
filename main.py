@@ -1,8 +1,13 @@
 import os
 import requests
+from fastapi import FastAPI
+from fastapi.responses import JSONResponse
 from mcp.server.fastmcp import FastMCP
 
-# Inicializamos el servidor FastMCP estándar
+# 1. Creamos la app de FastAPI que Render mantendrá viva en la web
+app = FastAPI(title="Estacion_AutoMind_API")
+
+# 2. Inicializamos el servidor MCP para estructurar las herramientas
 mcp = FastMCP("Estacion_AutoMind")
 
 # Credenciales de tu canal de ThingSpeak
@@ -33,11 +38,19 @@ def consultar_clima_actual() -> str:
     except Exception as error:
         return f"Error al conectar con ThingSpeak: {str(error)}"
 
+# 3. Creamos las rutas web para que Render vea que el servicio responde con éxito
+@app.get("/")
+def inicio():
+    return {"estado": "online", "servidor": "Estacion_AutoMind MCP a través de FastAPI"}
+
+@app.get("/mcp")
+def obtener_herramientas():
+    """Ruta opcional para visualizar la metadata del servidor MCP."""
+    return {"servidor": mcp.name, "herramientas": ["consultar_clima_actual"]}
+
 if __name__ == "__main__":
-    # Importación interna para asegurar compatibilidad con el entorno de Render
-    from mcp.server.fastmcp.server import ASMServer
-    
-    # Forzamos a que corra como un servidor web HTTP en el puerto que pide Render
+    import uvicorn
+    # Render asigna dinámicamente un puerto en la variable de entorno PORT
     puerto = int(os.environ.get("PORT", 8000))
-    server = ASMServer(mcp)
-    server.run(host="0.0.0.0", port=puerto, transport="http")
+    # Iniciamos uvicorn para escuchar las peticiones web
+    uvicorn.run(app, host="0.0.0.0", port=puerto)
