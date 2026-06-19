@@ -3,7 +3,7 @@ import requests
 from mcp.server.fastmcp import FastMCP
 
 # Inicializamos el servidor MCP en modo HTTP web
-mcp = FastMCP("Estacion_AutoMind", transport="http")
+mcp = FastMCP("Estacion_AutoMind")
 
 # Credenciales de tu canal de ThingSpeak
 CHANNEL_ID = "3370492"
