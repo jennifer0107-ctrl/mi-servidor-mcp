@@ -6,13 +6,13 @@ import statistics
 
 load_dotenv()
 
-# Configuración de ThingSpeak (Usa tus credenciales por defecto)
-THINGSPEAK_CHANNEL_ID = os.getenv("THINGSPEAK_CHANNEL_ID", "3370492")
-THINGSPEAK_READ_API_KEY = os.getenv("THINGSPEAK_READ_API_KEY", "85PT6XBHJ81R7MB3")
+# Configuración de ThingSpeak (usa variables de entorno; sin valores por defecto sensibles)
+THINGSPEAK_CHANNEL_ID = os.getenv("THINGSPEAK_CHANNEL_ID")
+THINGSPEAK_READ_API_KEY = os.getenv("THINGSPEAK_READ_API_KEY")
 
 mcp = FastMCP("MCP Estación Meteorológica")
 
-def limpiar_valores(feeds, campo_field): 
+def limpiar_valores(feeds, campo_field):
     """
     Extrae y convierte a flotante los valores válidos de un field específico de ThingSpeak.
     """
@@ -47,25 +47,25 @@ def mapear_feed_a_supabase(feed):
 # ==========================
 
 def _obtener_ultima_lectura():
-    url = f"https://api.thethingspeak.com/channels/{THINGSPEAK_CHANNEL_ID}/feeds/last.json"
+    url = f"https://api.thingspeak.com/channels/{THINGSPEAK_CHANNEL_ID}/feeds/last.json"
     params = {"api_key": THINGSPEAK_READ_API_KEY} if THINGSPEAK_READ_API_KEY else {}
-    
+
     try:
         response = requests.get(url, params=params)
         if response.status_code != 200:
             return {"mensaje": "Error al conectar con ThingSpeak"}
-        
+
         data = response.json()
         if not data or "entry_id" not in data:
             return {"mensaje": "No hay lecturas registradas"}
-            
+
         return mapear_feed_a_supabase(data)
     except Exception as e:
         return {"mensaje": f"Error de conexión: {str(e)}"}
 
 
 def _obtener_ultimas_lecturas(limite=50):
-    url = f"https://api.thethingspeak.com/channels/{THINGSPEAK_CHANNEL_ID}/feeds.json"
+    url = f"https://api.thingspeak.com/channels/{THINGSPEAK_CHANNEL_ID}/feeds.json"
     params = {"results": limite}
     if THINGSPEAK_READ_API_KEY:
         params["api_key"] = THINGSPEAK_READ_API_KEY
@@ -74,7 +74,7 @@ def _obtener_ultimas_lecturas(limite=50):
         response = requests.get(url, params=params)
         if response.status_code != 200:
             return []
-        
+
         feeds = response.json().get("feeds", [])
         feeds_ordenados = list(reversed(feeds))
         return [mapear_feed_a_supabase(f) for f in feeds_ordenados]
@@ -83,7 +83,7 @@ def _obtener_ultimas_lecturas(limite=50):
 
 
 def _obtener_datos_grafico(limite=100):
-    url = f"https://api.thethingspeak.com/channels/{THINGSPEAK_CHANNEL_ID}/feeds.json"
+    url = f"https://api.thingspeak.com/channels/{THINGSPEAK_CHANNEL_ID}/feeds.json"
     params = {"results": limite}
     if THINGSPEAK_READ_API_KEY:
         params["api_key"] = THINGSPEAK_READ_API_KEY
@@ -92,7 +92,7 @@ def _obtener_datos_grafico(limite=100):
         response = requests.get(url, params=params)
         if response.status_code != 200:
             return []
-        
+
         feeds = response.json().get("feeds", [])
         return [mapear_feed_a_supabase(f) for f in feeds]
     except Exception:
@@ -132,23 +132,30 @@ def _detectar_alertas():
     if "mensaje" in lectura:
         return lectura
 
+    # Si falta algún valor, se omite la evaluación de esa variable en vez de asumir 0
+    # (asumir 0 generaba falsas alertas de "temperatura baja" cuando el dato venía vacío).
+    temp = lectura.get("temp")
+    humedad = lectura.get("humedad")
+    presion = lectura.get("presion")
+
     alertas = []
 
-    temp = float(lectura.get("temp") or 0)
-    humedad = float(lectura.get("humedad") or 0)
-    presion = float(lectura.get("presion") or 0)
+    if temp is not None:
+        temp = float(temp)
+        if temp >= 35:
+            alertas.append("Temperatura alta")
+        if temp <= 15:
+            alertas.append("Temperatura baja")
 
-    if temp >= 35:
-        alertas.append("Temperatura alta")
+    if humedad is not None:
+        humedad = float(humedad)
+        if humedad >= 85:
+            alertas.append("Humedad elevada")
 
-    if temp <= 15:
-        alertas.append("Temperatura baja")
-
-    if humedad >= 85:
-        alertas.append("Humedad elevada")
-
-    if presion < 1000:
-        alertas.append("Posible lluvia")
+    if presion is not None:
+        presion = float(presion)
+        if presion < 1000:
+            alertas.append("Posible lluvia")
 
     return {
         "estado": "Con alertas" if alertas else "Normal",
@@ -234,3 +241,6 @@ Incluye KPIs, gráficos interactivos, alertas automáticas, tabla de lecturas re
 
 Entrega el resultado como una página web completa en HTML, CSS y JavaScript.
 """
+
+if __name__ == "__main__":
+    mcp.run()
